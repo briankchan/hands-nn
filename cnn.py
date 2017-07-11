@@ -11,6 +11,8 @@ import misc
 # from models.slim.nets import inception_v2
 from tensorflow.contrib import slim
 
+from model import Model, store_args, chunks
+
 DATA1 = "data/hands1-3650"
 DATA2 = "data/hands2-3650"
 IMAGES = DATA1 + "-images-500.npy"
@@ -34,73 +36,66 @@ TEST = range(400, len(IMG))
 # TEST_LAB = LAB[400:]
 
 
-class Classifier(object):
-    def __init__(self, width=640, height=480, depth=3, inception=False):
-        self.config = tf.ConfigProto(allow_soft_placement=True)  # log_device_placement=True
-        self.graph = tf.Graph()
-        self.reset()
-
-        self.height = height
-        self.width = width
-        self.depth = depth
-        self.inception = inception
-
-        with self.graph.as_default():
-            with self.graph.device("/gpu:0"):
-                self.images = tf.placeholder(tf.float32, [None, height, width, depth], "images")
-                self.target_labels = tf.placeholder(tf.bool, [None, height, width], "target_labels")
-
-                if inception:
-                    with slim.arg_scope(inception_v2.inception_v2_arg_scope()):
-                        net, end_points = inception_v2.inception_v2_base(self.images, final_endpoint='Mixed_3c')
-
-                    net = slim.avg_pool2d(net, [7, 7], stride=1, scope="MaxPool_0a_7x7")
-                    net = slim.dropout(net,
-                                       0.8, scope='Dropout_0b')
-                    net = slim.conv2d(net, 1, [1, 1], activation_fn=None,
-                                              normalizer_fn=None)  # , scope='Conv2d_0c_1x1'
-
-                    net = tf.pad(net, [[0, 0], [3, 3], [3, 3], [0, 0]])
-
-                    net = tf.layers.conv2d_transpose(
-                        name="deconv",
-                        inputs=net,
-                        filters=1,
-                        kernel_size=16,
-                        strides=8,
-                        padding="same",
-                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1.),
-                        activation=None)
-
-                    self.logits = tf.squeeze(net, axis=3)
-
-                    self.pred_labels = tf.greater(self.logits, 0)
-                else:
-                    self.pred_labels, self.logits = self.build_model(self.images)
-                    self.saver = tf.train.Saver()
-
-                self.loss = self.calculate_loss(self.logits, self.target_labels)
-
-                self.summary = tf.summary.merge_all()
-
-                self.saver = tf.train.Saver()
-
+class CNN(Model):
+    @store_args
+    def __init__(self,
+                 width=640,
+                 height=480,
+                 depth=3,
+                 inception=False,
+                 epochs=1,
+                 batch_size=16,
+                 rate=0.0001,
+                 epsilon=1e-8,
+                 pos_weight=10):
+        super().__init__()
+        self._build()
 
     def reset(self):
-        self.session = tf.Session(graph=self.graph, config=self.config)
+        with self.graph.as_default():
+            with self.graph.device("/gpu:0"):
+                self.session = tf.Session(graph=self.graph, config=self.config)
+                self._initialize_model()
         i = 0
         while True:
             i += 1
-            summary_path = "train/run{0}".format(i)
+            summary_path = "runs/run{0}".format(i)
             if not os.path.exists(summary_path) and not glob.glob(summary_path + "-*"):
                 break
         self.summary_path = summary_path
         self.run_num = i
         self.it = 0
 
-    def build_model(self, images):
-        """Model function for CNN."""
+    def _build(self):
+        self.config = tf.ConfigProto(allow_soft_placement=True)  # log_device_placement=True
+        self.graph = tf.Graph()
+        with self.graph.as_default():
+            with self.graph.device("/gpu:0"):
+                self.images, self.target_labels = self._build_inputs()
 
+                self.logits = self._build_inception_model(self.images) if self.inception\
+                              else self._build_model(self.images)
+
+                self.pred_labels = tf.greater(self.logits, 0)
+
+                self.loss = self._build_loss(self.logits, self.target_labels, self.pos_weight)
+
+
+                self.optimizer = self._build_optimizer(self.loss, self.rate, self.epsilon)
+
+                self.reset()
+
+                self.summary = tf.summary.merge_all()
+
+                self.saver = tf.train.Saver()
+
+    def _build_inputs(self):
+        images = tf.placeholder(tf.float32, [None, self.height, self.width, self.depth], "images")
+        target_labels = tf.placeholder(tf.bool, [None, self.height, self.width], "target_labels")
+        return images, target_labels
+
+    def _build_model(self, images):
+        """Model function for CNN."""
         regularization_scale = 1.
 
         images = tf.subtract(tf.divide(images, 255 / 2), 1)
@@ -236,46 +231,35 @@ class Classifier(object):
         # labels = tf.greater(first, second)  # first is True, second is False
 
         logits = tf.squeeze(deconv, axis=3)
-        labels = tf.greater(logits, 0)
 
-        return labels, logits
+        return logits
 
-        # # Dense Layer
-        # pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
-        # dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
-        # dropout = tf.layers.dropout(
-        #     inputs=dense, rate=0.4, training=mode == learn.ModeKeys.TRAIN)
-        #
-        # # Logits Layer
-        # logits = tf.layers.dense(inputs=dropout, units=10)
+    def _build_inception_model(self, images):
+        from models.slim.nets import inception_v2
+        with slim.arg_scope(inception_v2.inception_v2_arg_scope()):
+            net, end_points = inception_v2.inception_v2_base(images, final_endpoint='Mixed_3c')
 
-        # Calculate Loss (for both TRAIN and EVAL modes)
-        # if mode != learn.ModeKeys.INFER:
-        #     onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=10)
-        #     loss = tf.losses.softmax_cross_entropy(
-        #         onehot_labels=onehot_labels, logits=logits)
-        #
-        # # Configure the Training Op (for TRAIN mode)
-        # if mode == learn.ModeKeys.TRAIN:
-        #     train_op = tf.contrib.layers.optimize_loss(
-        #         loss=loss,
-        #         global_step=tf.contrib.framework.get_global_step(),
-        #         learning_rate=0.001,
-        #         optimizer="SGD")
-        #
-        # # Generate Predictions
-        # predictions = {
-        #     "classes": tf.argmax(
-        #         input=logits, axis=1),
-        #     "probabilities": tf.nn.softmax(
-        #         logits, name="softmax_tensor")
-        # }
-        #
-        # # Return a ModelFnOps object
-        # return model_fn_lib.ModelFnOps(
-        #     mode=mode, predictions=predictions, loss=loss, train_op=train_op)
+        net = slim.avg_pool2d(net, [7, 7], stride=1, scope="MaxPool_0a_7x7")
+        net = slim.dropout(net,
+                           0.8, scope='Dropout_0b')
+        net = slim.conv2d(net, 1, [1, 1], activation_fn=None,
+                          normalizer_fn=None)  # , scope='Conv2d_0c_1x1'
 
-    def calculate_loss(self, logits, labels, pos_weight=1):
+        net = tf.pad(net, [[0, 0], [3, 3], [3, 3], [0, 0]])
+
+        net = tf.layers.conv2d_transpose(
+            name="deconv",
+            inputs=net,
+            filters=1,
+            kernel_size=16,
+            strides=8,
+            padding="same",
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(1.),
+            activation=None)
+
+        return tf.squeeze(net, axis=3)
+
+    def _build_loss(self, logits, labels, pos_weight=1):
         """Calculate the loss from the logits and the labels.
         Args:
           logits: tensor, float - [batch_size, width, height, num_classes].
@@ -288,47 +272,37 @@ class Classifier(object):
         Returns:
           loss: Loss tensor of type float.
         """
-        with self.graph.as_default():
-            with self.graph.device("/gpu:0"):
-                with tf.name_scope('loss'):
-                    # cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=tf.to_int32(labels))
+        with tf.name_scope('loss'):
+            # cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=tf.to_int32(labels))
 
-                    cross_entropy = tf.nn.weighted_cross_entropy_with_logits(logits=logits, targets=tf.to_float(labels), pos_weight=pos_weight)
-                    cross_entropy_mean = tf.reduce_mean(cross_entropy, name='x_entropy_mean')
-                    tf.summary.scalar('x_entropy_mean', cross_entropy_mean)
-                    return cross_entropy_mean
+            cross_entropy = tf.nn.weighted_cross_entropy_with_logits(logits=logits, targets=tf.to_float(labels), pos_weight=pos_weight)
+            cross_entropy_mean = tf.reduce_mean(cross_entropy, name='x_entropy_mean')
+            tf.summary.scalar('x_entropy_mean', cross_entropy_mean)
+            return cross_entropy_mean
 
-    def make_train_op(self, loss, rate, epsilon, initialize=True):
-        with self.graph.as_default():
-            with self.graph.device("/gpu:0"):
-                if self.inception and initialize:
-                    vars = [var for var in tf.global_variables() if var.name.startswith("InceptionV2")]
-                    saver = tf.train.Saver(vars)
+    def _build_optimizer(self, loss, rate, epsilon):
+        optimizer = tf.train.AdamOptimizer(learning_rate=rate, epsilon=epsilon)
+        return optimizer.minimize(loss)
 
-                optimizer = tf.train.AdamOptimizer(learning_rate=rate, epsilon=epsilon)
-                op = optimizer.minimize(loss)
+    def _initialize_model(self):
+        self.session.run(tf.global_variables_initializer())
+        if self.inception:
+            vars = [var for var in tf.global_variables() if var.name.startswith("InceptionV2")]
+            saver = tf.train.Saver(vars)
+            saver.restore(self.session, INCEPTION_CHECKPOINT)
 
-                if initialize:
-                    self.session.run(tf.global_variables_initializer())
-                    if self.inception:
-                        saver.restore(self.session, INCEPTION_CHECKPOINT)
-
-                return op
-
-    def train(self, images, labels, indices=None, epochs=1, batch_size=8, rate=0.0001, epsilon=1e-8, pos_weight=10, reset=True):
+    def train(self, images, labels, indices=None, epochs=None, batch_size=None, reset=True):
         if indices is None:
             indices = list(range(len(images)))
         else:
             indices = list(indices)
+        if epochs == None:
+            epochs = self.epochs
+        if batch_size == None:
+            batch_size = self.batch_size
 
         if reset:
             self.reset()
-            loss = self.calculate_loss(self.logits, self.target_labels, pos_weight)
-            # self.loss = loss
-            train_op = self.make_train_op(loss, rate, epsilon, initialize=reset)
-            self.train_op = train_op
-        else:
-            train_op = self.train_op
 
         writer = tf.summary.FileWriter(self.summary_path, self.graph)
 
@@ -340,7 +314,7 @@ class Classifier(object):
             print("===============")
 
             random.shuffle(indices)
-            batches = misc.chunks(indices, batch_size)
+            batches = chunks(indices, batch_size)
             i = 0
 
             for frames in batches:
@@ -350,7 +324,7 @@ class Classifier(object):
                     print("batch", i)
                 # frames = indices[i * batch_size : (i + 1) * batch_size]
                 # _, losses = self.session.run([train_op, tf.get_collection('losses')],
-                summary, _ = self.session.run([self.summary, train_op],
+                summary, _ = self.session.run([self.summary, self.optimizer],
                                               {self.images: images[frames], self.target_labels: labels[frames]})
                 writer.add_summary(summary, self.it)
         writer.close()
@@ -389,7 +363,7 @@ class Classifier(object):
         print("Total:", total)
         return pred
 
-    def save(self, pathname=None):
+    def _save_model(self, pathname=None):
         if pathname is None:
             pathname = self.summary_path
         self.saver.save(self.session, pathname+"/model.ckpt")
@@ -398,15 +372,13 @@ class Classifier(object):
         if pathname is None:
             if run_num is None:
                 run_num = self.run_num - 1
-            pathname = "train/run{0}".format(run_num)
+            pathname = "runs/run{0}".format(run_num)
             if not os.path.exists(pathname):
                 pathname = glob.glob(pathname + "-*")[0]
 
         with self.graph.as_default():
             with self.graph.device("/gpu:0"):
                 self.saver.restore(self.session, pathname+"/model.ckpt")
-
-m = Classifier(inception=False)
 
 def train(images=IMG, labels=LAB, indices=TRAIN, *args, **kwargs):
     return m.train(images, labels, indices, *args, **kwargs)
@@ -423,7 +395,7 @@ def split(ranges, test_chunks, num_chunks):
     train_indices = []
     for indices in ranges:
         chunk_size = math.ceil(len(indices) / num_chunks)
-        chunks = np.array(list(misc.chunks(indices, chunk_size)))
+        chunks = np.array(list(chunks(indices, chunk_size)))
         test_indices += chunks[test_chunks].tolist()
         train_indices += np.delete(chunks, test_chunks, axis=0).tolist()
 
@@ -494,3 +466,9 @@ def split_run_save(images, labels, train, test, *args, **kwargs):
     pred = run(images, labels, train, test, *args, **kwargs)
     m.save()
     return pred
+
+m = CNN(inception=False)
+
+if __name__ == "__main__":
+    m.train(IMG, LAB, TRAIN)
+    m.test(IMG, LAB, TEST)

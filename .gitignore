@@ -1,3 +1,6 @@
+runs
 data
+models
 inception-v3
 .idea
+__pycache__
