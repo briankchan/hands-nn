@@ -1,43 +1,23 @@
 import os
-import math
 import random
 import glob
 
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
 import misc
 
 # from models.slim.nets import inception_v2
 from tensorflow.contrib import slim
 
-from model import Model, store_args, chunks
+from model import Model, save_args, chunks
 
-DATA1 = "data/hands1-3650"
-DATA2 = "data/hands2-3650"
-IMAGES = DATA1 + "-images-500.npy"
-LABELS = DATA1 + "-labels-500.npy"
-
-IMAGES_FULL = DATA1 + "-images.npy"
-LABELS_FULL = DATA1 + "-labels.npy"
-
-IMAGES2_FULL = DATA2 + "-images.npy"
-LABELS2_FULL = DATA2 + "-labels.npy"
 
 INCEPTION_CHECKPOINT = "./inception_v2.ckpt"
 
-IMG = np.load(IMAGES)
-LAB = np.load(LABELS)
-TRAIN = range(400)
-TEST = range(400, len(IMG))
-# TRAIN_IMG = IMG[:400]
-# TRAIN_LAB = LAB[:400]
-# TEST_IMG = IMG[400:]
-# TEST_LAB = LAB[400:]
-
-
 class CNN(Model):
-    @store_args
+    _class_log_path_pattern = "cnn/run{}"
+
+    @save_args
     def __init__(self,
                  width=640,
                  height=480,
@@ -49,24 +29,15 @@ class CNN(Model):
                  epsilon=1e-8,
                  pos_weight=10):
         super().__init__()
-        self._build()
 
-    def reset(self):
+    def _reset_model(self):
         with self.graph.as_default():
             with self.graph.device("/gpu:0"):
                 self.session = tf.Session(graph=self.graph, config=self.config)
                 self._initialize_model()
-        i = 0
-        while True:
-            i += 1
-            summary_path = "runs/run{0}".format(i)
-            if not os.path.exists(summary_path) and not glob.glob(summary_path + "-*"):
-                break
-        self.summary_path = summary_path
-        self.run_num = i
         self.it = 0
 
-    def _build(self):
+    def _build_model(self):
         self.config = tf.ConfigProto(allow_soft_placement=True)  # log_device_placement=True
         self.graph = tf.Graph()
         with self.graph.as_default():
@@ -74,7 +45,7 @@ class CNN(Model):
                 self.images, self.target_labels = self._build_inputs()
 
                 self.logits = self._build_inception_model(self.images) if self.inception\
-                              else self._build_model(self.images)
+                              else self._build_network(self.images)
 
                 self.pred_labels = tf.greater(self.logits, 0)
 
@@ -94,7 +65,7 @@ class CNN(Model):
         target_labels = tf.placeholder(tf.bool, [None, self.height, self.width], "target_labels")
         return images, target_labels
 
-    def _build_model(self, images):
+    def _build_network(self, images):
         """Model function for CNN."""
         regularization_scale = 1.
 
@@ -274,7 +245,6 @@ class CNN(Model):
         """
         with tf.name_scope('loss'):
             # cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=tf.to_int32(labels))
-
             cross_entropy = tf.nn.weighted_cross_entropy_with_logits(logits=logits, targets=tf.to_float(labels), pos_weight=pos_weight)
             cross_entropy_mean = tf.reduce_mean(cross_entropy, name='x_entropy_mean')
             tf.summary.scalar('x_entropy_mean', cross_entropy_mean)
@@ -291,7 +261,7 @@ class CNN(Model):
             saver = tf.train.Saver(vars)
             saver.restore(self.session, INCEPTION_CHECKPOINT)
 
-    def train(self, images, labels, indices=None, epochs=None, batch_size=None, reset=True):
+    def train(self, images, labels, indices=None, epochs=None, batch_size=None):
         if indices is None:
             indices = list(range(len(images)))
         else:
@@ -301,10 +271,7 @@ class CNN(Model):
         if batch_size == None:
             batch_size = self.batch_size
 
-        if reset:
-            self.reset()
-
-        writer = tf.summary.FileWriter(self.summary_path, self.graph)
+        writer = tf.summary.FileWriter(self.log_path, self.graph)
 
         print("Training")
 
@@ -315,160 +282,35 @@ class CNN(Model):
 
             random.shuffle(indices)
             batches = chunks(indices, batch_size)
-            i = 0
 
-            for frames in batches:
+            for i, frames in enumerate(batches, 1):
                 self.it += 1
-                i += 1
                 if i % 10 == 0:
                     print("batch", i)
-                # frames = indices[i * batch_size : (i + 1) * batch_size]
                 # _, losses = self.session.run([train_op, tf.get_collection('losses')],
                 summary, _ = self.session.run([self.summary, self.optimizer],
                                               {self.images: images[frames], self.target_labels: labels[frames]})
                 writer.add_summary(summary, self.it)
         writer.close()
 
-    def test(self, images, labels, indices=None):
+    def predict(self, images, indices=None):
         if indices is None:
             indices = range(len(images))
-            lab = labels
         else:
             indices = np.r_[tuple(indices)]
-            lab = labels[indices]
-        pred = np.empty_like(lab)
+        images = images[indices]
+        # pred like images, but only 1 channel ([count, h, w] vs [count, h, w, rgb=3])
+        pred = np.empty(images.shape[:-1], dtype=np.bool)
         print("Testing")
-        for index, i in zip(indices, range(len(indices))):
+        for i, image in enumerate(images):
             pred[i] = self.session.run(self.pred_labels,
-                                       {self.images: [images[index]],
-                                        self.target_labels: [labels[index]]})[0]
-        errors = (pred != lab).sum()
-        print("Avg errors:", errors / len(lab))
-        print("Pct errors:", errors / lab.size)
-
-        intersection = (pred * lab).sum()
-        pred_sum = pred.sum()
-        exp_sum = lab.sum()
-        precision = intersection / pred_sum
-        recall = intersection.sum() / exp_sum
-        f1 = 2 * precision * recall / (precision + recall)
-        print("Precision:", precision)
-        print("Recall:", recall)
-        print("F1 score:", f1)
-
-        total = lab.size
-        print("Confusion matrix")
-        print("Predicted hands:", intersection, (pred_sum-intersection))
-        print("Predicted not hands", (exp_sum-intersection), (total - pred_sum - exp_sum + intersection))
-        print("Total:", total)
+                                       {self.images: [image]})[0]
         return pred
 
-    def _save_model(self, pathname=None):
-        if pathname is None:
-            pathname = self.summary_path
-        self.saver.save(self.session, pathname+"/model.ckpt")
+    def _save_model(self, path):
+        self.saver.save(self.session, path+"/model.ckpt")
 
-    def restore(self, run_num=None, pathname=None):
-        if pathname is None:
-            if run_num is None:
-                run_num = self.run_num - 1
-            pathname = "runs/run{0}".format(run_num)
-            if not os.path.exists(pathname):
-                pathname = glob.glob(pathname + "-*")[0]
-
-        with self.graph.as_default():
-            with self.graph.device("/gpu:0"):
-                self.saver.restore(self.session, pathname+"/model.ckpt")
-
-def train(images=IMG, labels=LAB, indices=TRAIN, *args, **kwargs):
-    return m.train(images, labels, indices, *args, **kwargs)
-
-def test(images=IMG, labels=LAB, indices=TEST):
-    return m.test(images, labels, indices)
-
-def run(img=IMG, lab=LAB, train_indices=TRAIN, test_indices=TEST, *args, **kwargs):
-    train(img, lab, train_indices, *args, **kwargs)
-    return test(img, lab, test_indices)
-
-def split(ranges, test_chunks, num_chunks):
-    test_indices = []
-    train_indices = []
-    for indices in ranges:
-        chunk_size = math.ceil(len(indices) / num_chunks)
-        chunks = np.array(list(chunks(indices, chunk_size)))
-        test_indices += chunks[test_chunks].tolist()
-        train_indices += np.delete(chunks, test_chunks, axis=0).tolist()
-
-    test_indices = np.concatenate(test_indices)
-    train_indices = np.concatenate(train_indices)
-
-    return train_indices, test_indices
-
-def split_and_run(images, labels, test_chunks, num_chunks=9, ranges=None, *args, **kwargs):
-    if ranges is None:
-        ranges = [range(len(images))]
-
-    train_indices, test_indices = split(ranges, test_chunks, num_chunks)
-
-    return run(images, labels, train_indices, test_indices, *args, **kwargs), test_indices
-
-def randsplit_and_run(images, labels, num_chunks=9, num_test_chunks=1, ranges=None, *args, **kwargs):
-    test_chunks = np.random.choice(range(num_chunks), num_test_chunks, replace=False)
-    return split_and_run(images, labels, test_chunks, num_chunks, ranges, *args, **kwargs)
-
-def side_concat(img, lab):
-    a = img
-    b = (lab * 255).repeat(3).reshape(480, 640, 3).astype(np.uint8)
-    return np.concatenate((a, b), axis=1)
-
-def overlay(img, lab, truth):
-    img = np.copy(img)
-    img[truth, 2] = 255
-    img[truth, :2] //= 2
-
-    img[lab, 0] = 255
-
-    intersection = truth*lab
-    img[lab - intersection, 1:] //= 2
-    return img
-
-def imshow(img):
-    plt.imshow(img)
-    plt.show()
-
-def labshow(labels, i, images=IMG, truth=LAB, test_indices=TEST):
-    if test_indices is None:
-        test_indices = range(len(images))
-    imshow(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
-
-def get_all_data():
-    # throw out garbage labels at the end
-    images1 = np.load(IMAGES_FULL)[:-130]
-    labels1 = np.load(LABELS_FULL)[:-130]
-    images2 = np.load(IMAGES2_FULL)
-    labels2 = np.load(LABELS2_FULL)
-
-    images = np.concatenate([images1, images2])
-    labels = np.concatenate([labels1, labels2])
-
-    count1 = len(images1)
-    split1 = count1 // 10 * 9
-    count2 = len(images2)
-    split2 = count2 // 10 * 9
-
-    train_ranges = [range(split1), range(count1, count1+split2)]
-    test_ranges = [range(split1, count1), range(count1+split2, count1+count2)]
-
-    return images, labels, train_ranges, test_ranges
-
-def split_run_save(images, labels, train, test, *args, **kwargs):
-    train, val = split(train, [5], 9)
-    pred = run(images, labels, train, test, *args, **kwargs)
-    m.save()
-    return pred
-
-m = CNN(inception=False)
-
-if __name__ == "__main__":
-    m.train(IMG, LAB, TRAIN)
-    m.test(IMG, LAB, TEST)
+    def _load_model(self, path):
+        # with self.graph.as_default():
+        #     with self.graph.device("/gpu:0"):
+        self.saver.restore(self.session, path+"/model.ckpt")
