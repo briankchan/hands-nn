@@ -1,6 +1,7 @@
-runs
-data
-models
-inception-v3
-.idea
-__pycache__
+/runs/
+/data/*
+!/data/*.py
+/models/
+/inception-v3/
+.idea/
+__pycache__/
