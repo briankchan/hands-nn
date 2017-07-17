@@ -32,9 +32,10 @@ class TFModel(Model, metaclass=ABCMeta):
                 self.saver = tf.train.Saver()
 
     def _build_inputs(self):
-        images = tf.placeholder(tf.float32, [None, self.height, self.width, self.depth], "images")
-        target_labels = tf.placeholder(tf.bool, [None, self.height, self.width], "target_labels")
-        return images, target_labels
+        with tf.name_scope("input"):
+            images = tf.placeholder(tf.float32, [None, self.height, self.width, self.depth], "images")
+            target_labels = tf.placeholder(tf.bool, [None, self.height, self.width], "target_labels")
+            return images, target_labels
 
     @abstractmethod
     def _build_network(self, images):
@@ -61,8 +62,9 @@ class TFModel(Model, metaclass=ABCMeta):
             return cross_entropy_mean
 
     def _build_optimizer(self, loss, rate, epsilon, step):
-        optimizer = tf.train.AdamOptimizer(learning_rate=rate, epsilon=epsilon)
-        return optimizer.minimize(loss, global_step=step, name="optimize")
+        with tf.name_scope("optimizer"):
+            optimizer = tf.train.AdamOptimizer(learning_rate=rate, epsilon=epsilon)
+            return optimizer.minimize(loss, global_step=step, name="optimize")
 
     def _reset_model(self):
         with self.graph.as_default():
