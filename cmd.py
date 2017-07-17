@@ -89,10 +89,9 @@ def main(model, dataset, use_dev=True, save=False, load=None, path=None, **model
             m.save(path)
     else:
         m = model.load(None if load == -1 else load, path)
-    m.test(images, labels, test_idx)
+    return m.test(images, labels, test_idx)
 
-
-if __name__ == "__main__":
+def parse_args():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("model", default="cnn")
@@ -102,7 +101,9 @@ if __name__ == "__main__":
     parser.add_argument("--path")
     args, extra = parser.parse_known_args()
     model_args = parse_extra_args(extra)
-    # main(args.model, args.dataset, args.save, args.load, **model_args)
     all_args = vars(args)
     all_args.update(model_args)
-    main(**all_args)
+    return all_args
+
+if __name__ == "__main__":
+    main(**parse_args())
