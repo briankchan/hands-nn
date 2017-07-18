@@ -2,28 +2,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 from cnn import CNN
 import data
-from data.data import split, IMG, LAB, TRAIN, TEST
+# from data.data import split
 
+IMAGES, LABELS, TRAIN, TEST = [None] * 4
 
-
-
-def split_run_save(images, labels, train, test, *args, **kwargs):
-    train, val = split(train, [5], 9)
-    pred = run(images, labels, train, test, *args, **kwargs)
-    m.save()
-    return pred
-
-def split_and_run(images, labels, test_chunks, num_chunks=9, ranges=None, *args, **kwargs):
-    if ranges is None:
-        ranges = [range(len(images))]
-
-    train_indices, test_indices = split(ranges, test_chunks, num_chunks)
-
-    return run(images, labels, train_indices, test_indices, *args, **kwargs), test_indices
-
-def randsplit_and_run(images, labels, num_chunks=9, num_test_chunks=1, ranges=None, *args, **kwargs):
-    test_chunks = np.random.choice(range(num_chunks), num_test_chunks, replace=False)
-    return split_and_run(images, labels, test_chunks, num_chunks, ranges, *args, **kwargs)
+# def split_run_save(images, labels, train, test, *args, **kwargs):
+#     train, val = split(train, [5], 9)
+#     pred = run(images, labels, train, test, *args, **kwargs)
+#     m.save()
+#     return pred
+#
+# def split_and_run(images, labels, test_chunks, num_chunks=9, ranges=None, *args, **kwargs):
+#     if ranges is None:
+#         ranges = [range(len(images))]
+#
+#     train_indices, test_indices = split(ranges, test_chunks, num_chunks)
+#
+#     return run(images, labels, train_indices, test_indices, *args, **kwargs), test_indices
+#
+# def randsplit_and_run(images, labels, num_chunks=9, num_test_chunks=1, ranges=None, *args, **kwargs):
+#     test_chunks = np.random.choice(range(num_chunks), num_test_chunks, replace=False)
+#     return split_and_run(images, labels, test_chunks, num_chunks, ranges, *args, **kwargs)
 
 def side_concat(img, lab):
     a = img
@@ -46,9 +45,13 @@ def imshow(img):
     plt.imshow(img)
     plt.show()
 
-def labshow(labels, i, images=IMG, truth=LAB, test_indices=TEST):
+def labshow(labels, i, images=None, truth=None, test_indices=None):
+    if images is None:
+        images = IMAGES
+    if truth is None:
+        truth = LABELS
     if test_indices is None:
-        test_indices = range(len(images))
+        test_indices = TEST
     imshow(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
 
 def parse_extra_args(args):
@@ -80,16 +83,17 @@ MODELS = {
 
 
 def main(model, dataset, use_dev=True, save=False, load=None, path=None, **model_args):
-    images, labels, train_idx, test_idx = data.get_dataset(dataset, use_dev)
+    global IMAGES, LABELS, TRAIN, TEST
+    IMAGES, LABELS, TRAIN, TEST = data.get_dataset(dataset, use_dev)
     model = MODELS[model]
     if load is None:
         m = model(**model_args)
-        m.train(images, labels, train_idx)
+        m.train(IMAGES, LABELS, TRAIN)
         if save:
             m.save(path)
     else:
         m = model.load(None if load == -1 else load, path)
-    return m.test(images, labels, test_idx)
+    return m.test(IMAGES, LABELS, TEST)
 
 def parse_args():
     import argparse
