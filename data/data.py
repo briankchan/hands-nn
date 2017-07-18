@@ -42,9 +42,50 @@ def get_dataset(dataset, use_dev=True):
     if dataset == 0:
         return IMG, LAB, TRAIN, TEST
     elif dataset == 1:
-        return None
+        images = np.load(IMAGES_FULL)[:-130]
+        labels = np.load(LABELS_FULL)[:-130]
+
+        count = len(images)
+        half = count // 2
+        six_tenths = count // 10 * 6
+        nine_tenths = count // 10 * 9
+
+        train = [range(half), range(six_tenths, nine_tenths)]
+        test = range(half, six_tenths) if use_dev else range(nine_tenths, count)
+        train = np.concatenate(train)
+        return images, labels, train, test
     elif dataset == 2:
-        return None
+        images = np.load(IMAGES2_FULL)
+        labels = np.load(LABELS2_FULL)
+
+        count = len(images)
+        half = count // 2
+        six_tenths = count // 10 * 6
+        nine_tenths = count // 10 * 9
+
+        train = [range(half), range(six_tenths, nine_tenths)]
+        test = range(half, six_tenths) if use_dev else range(nine_tenths, count)
+        train = np.concatenate(train)
+        return images, labels, train, test
+    elif dataset == 3:
+        images1 = np.load(IMAGES_FULL)[:-130]
+        labels1 = np.load(LABELS_FULL)[:-130]
+        images2 = np.load(IMAGES2_FULL)
+        labels2 = np.load(LABELS2_FULL)
+
+        images = np.concatenate([images1, images2])
+        labels = np.concatenate([labels1, labels2])
+
+        count1 = len(images1)
+        split1 = count1 // 10 * 9
+        count2 = len(images2)
+        split2 = count2 // 10 * 9
+
+        train = [range(split1), range(count1, count1+split2)]
+        test = [range(split1, count1), range(count1+split2, count1+count2)]
+        train = np.concatenate(train)
+        test = np.concatenate(test)
+        return images, labels, train, test
 
 def get_all_data():
     # throw out garbage labels at the end
