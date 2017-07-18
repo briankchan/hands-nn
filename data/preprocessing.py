@@ -324,6 +324,7 @@ def onkeypress(event):
 
     event.canvas.figure.gca().imshow(overlayed)
     event.canvas.draw()
+    # TODO: clear canvas before redrawing
 
 
 def tryrts():
