@@ -8,7 +8,7 @@ from tfmodel import TFModel
 
 INCEPTION_CHECKPOINT = "./inception_v2.ckpt"
 
-class CNN(TFModel):
+class CNNInception(TFModel):
     _class_log_path_pattern = "cnn_inception/run{}"
 
     @save_args

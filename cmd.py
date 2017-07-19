@@ -1,6 +1,7 @@
+import importlib
+
 import numpy as np
 import matplotlib.pyplot as plt
-from cnn import CNN
 import data
 # from data.data import split
 
@@ -78,15 +79,20 @@ def parse_extra_args(args):
     return output
 
 MODELS = {
-    "cnn": CNN
+    "cnn": ("cnn", "CNN"),
+    "cnn_inception": ("cnn_inception", "CNNInception")
 }
 
+def import_model(model):
+    module_name, class_name = MODELS[model]
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name)
 
-def main(model, dataset, use_dev=True, save=False, load=None, path=None, **model_args):
+def main(model, dataset, use_dev=True, remove_noise=False, save=False, load=None, path=None, **model_args):
     global IMAGES, LABELS, TRAIN, TEST
     print("Loading data")
-    IMAGES, LABELS, TRAIN, TEST = data.get_dataset(dataset, use_dev)
-    model = MODELS[model]
+    IMAGES, LABELS, TRAIN, TEST = data.get_dataset(dataset, use_dev, remove_noise)
+    model = import_model(model)
     if load is None:
         print("Creating model")
         m = model(**model_args)
@@ -106,7 +112,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("model", default="cnn")
     parser.add_argument("dataset", default=1, choices=[0, 1, 2], type=int)
-    parser.add_argument("--save", action="store_true") # mutally excluse save/load path?
+    parser.add_argument("--remove_noise", action="store_true")
+    parser.add_argument("--save", action="store_true") # mutally exclude save/load path?
     parser.add_argument("--load", default=argparse.SUPPRESS, type=int)
     parser.add_argument("--path")
     args, extra = parser.parse_known_args()

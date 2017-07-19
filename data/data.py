@@ -40,9 +40,9 @@ def get_small_dataset():
         TEST = range(400, len(IMG))
     return IMG, LAB, TRAIN, TEST
 
-def get_dataset(dataset, use_dev=True):
+def get_dataset(dataset, use_dev=True, rem_noise=False):
     if dataset == 0:
-        return get_small_dataset()
+        images, labels, train, test = get_small_dataset()
     elif dataset == 1:
         images = np.load(IMAGES1)[:-130]
         labels = np.load(LABELS1)[:-130]
@@ -55,7 +55,6 @@ def get_dataset(dataset, use_dev=True):
         train = [range(half), range(six_tenths, nine_tenths)]
         test = range(half, six_tenths) if use_dev else range(nine_tenths, count)
         train = np.concatenate(train)
-        return images, labels, train, test
     elif dataset == 2:
         images = np.load(IMAGES2)
         labels = np.load(LABELS2)
@@ -68,7 +67,6 @@ def get_dataset(dataset, use_dev=True):
         train = [range(half), range(six_tenths, nine_tenths)]
         test = range(half, six_tenths) if use_dev else range(nine_tenths, count)
         train = np.concatenate(train)
-        return images, labels, train, test
     elif dataset == 3:
         images1 = np.load(IMAGES1)[:-130]
         labels1 = np.load(LABELS1)[:-130]
@@ -87,7 +85,12 @@ def get_dataset(dataset, use_dev=True):
         test = [range(split1, count1), range(count1+split2, count1+count2)]
         train = np.concatenate(train)
         test = np.concatenate(test)
-        return images, labels, train, test
+    else:
+        raise ValueError
+    if rem_noise:
+        for i, image in enumerate(images):
+            images[i] = remove_noise(image)
+    return images, labels, train, test
 
 def get_all_data():
     # throw out garbage labels at the end
