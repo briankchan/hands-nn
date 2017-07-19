@@ -84,15 +84,21 @@ MODELS = {
 
 def main(model, dataset, use_dev=True, save=False, load=None, path=None, **model_args):
     global IMAGES, LABELS, TRAIN, TEST
+    print("Loading data")
     IMAGES, LABELS, TRAIN, TEST = data.get_dataset(dataset, use_dev)
     model = MODELS[model]
     if load is None:
+        print("Creating model")
         m = model(**model_args)
+        print("Training model")
         m.train(IMAGES, LABELS, TRAIN)
         if save:
+            print("Saving model")
             m.save(path)
     else:
+        print("Loading model")
         m = model.load(None if load == -1 else load, path)
+    print("Testing model")
     return m.test(IMAGES, LABELS, TEST)
 
 def parse_args():

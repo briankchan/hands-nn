@@ -87,8 +87,6 @@ class TFModel(Model, metaclass=ABCMeta):
 
         writer = tf.summary.FileWriter(self.log_path, self.graph)
 
-        print("Training")
-
         for epoch in range(epochs):
             print("===============")
             print("EPOCH", epoch+1)
@@ -114,7 +112,6 @@ class TFModel(Model, metaclass=ABCMeta):
         images = images[indices]
         # pred like images, but only 1 channel ([count, h, w] vs [count, h, w, rgb=3])
         pred = np.empty(images.shape[:-1], dtype=np.bool)
-        print("Testing")
         for i, image in enumerate(images):
             pred[i] = self.session.run(self.pred_labels,
                                        {self.images: [image]})[0]
