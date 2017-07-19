@@ -4,11 +4,20 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 import tensorflow as tf
 
-from model import Model
+from model import Model, save_args
 from misc import chunks
 
 class TFModel(Model, metaclass=ABCMeta):
-    def __init__(self):
+    @save_args
+    def __init__(self,
+                 width=640,
+                 height=480,
+                 depth=3,
+                 epochs=1,
+                 batch_size=12,
+                 rate=0.0001,
+                 epsilon=1e-8,
+                 pos_weight=10):
         super().__init__()
         # batch size, epochs, train stuff, height/width, depth, pos weight...
 

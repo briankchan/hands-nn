@@ -18,7 +18,7 @@ class CNN(TFModel):
                  rate=0.0001,
                  epsilon=1e-8,
                  pos_weight=10):
-        super().__init__()
+        super().__init__(width, height, depth, epochs, batch_size, rate, epsilon, pos_weight)
 
     def _build_network(self, images):
         """Model function for CNN."""
