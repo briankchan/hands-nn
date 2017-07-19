@@ -192,15 +192,17 @@ def save_args(method):
     @functools.wraps(method)
     def wrapper(*positional_args, **keyword_args):
         self = positional_args[0]
-        # Get default arg values
-        args = defaults.copy()
-        # Add provided arg values
-        list(map(args.update, (zip(arg_names, positional_args[1:]), keyword_args.items())))
-        # Store values in instance as attributes
-        # self.__dict__.update(args)
-        vars(self).update(args)
-        # Also store values to separate dict
-        self._args = args
+        # Only run if args not already saved (i.e. dict is empty)
+        if not self._args:
+            # Get default arg values
+            args = defaults.copy()
+            # Add provided arg values
+            list(map(args.update, (zip(arg_names, positional_args[1:]), keyword_args.items())))
+            # Store values in instance as attributes
+            # self.__dict__.update(args)
+            vars(self).update(args)
+            # Also store values to separate dict
+            self._args = args
         return method(*positional_args, **keyword_args)
 
     return wrapper
