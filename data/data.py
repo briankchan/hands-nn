@@ -36,81 +36,74 @@ def get_small_dataset():
     if IMG is None:
         IMG = np.load(IMAGES_SMALL)
         LAB = np.load(LABELS_SMALL)
-        TRAIN = range(400)
-        TEST = range(400, len(IMG))
+        TRAIN = [range(400)]
+        TEST = [range(400, len(IMG))]
     return IMG, LAB, TRAIN, TEST
 
+def split_dataset(images, labels, use_dev=True):
+    count = len(images)
+    half = count // 2
+    six_tenths = count // 10 * 6
+    nine_tenths = count // 10 * 9
+
+    train = [range(half), range(six_tenths, nine_tenths)]
+    test = [range(half, six_tenths) if use_dev else range(nine_tenths, count)]
+    return train, test
+
 def get_dataset(dataset, use_dev=True, rem_noise=False):
-    if dataset == 0:
+    if dataset == "small":
         images, labels, train, test = get_small_dataset()
-    elif dataset == 1:
+    elif dataset == "1":
         images = np.load(IMAGES1)[:-130]
         labels = np.load(LABELS1)[:-130]
-
-        count = len(images)
-        half = count // 2
-        six_tenths = count // 10 * 6
-        nine_tenths = count // 10 * 9
-
-        train = [range(half), range(six_tenths, nine_tenths)]
-        test = range(half, six_tenths) if use_dev else range(nine_tenths, count)
-        train = np.concatenate(train)
-    elif dataset == 2:
+        train, test = split_dataset(images, labels, use_dev)
+    elif dataset == "2":
         images = np.load(IMAGES2)
         labels = np.load(LABELS2)
-
-        count = len(images)
-        half = count // 2
-        six_tenths = count // 10 * 6
-        nine_tenths = count // 10 * 9
-
-        train = [range(half), range(six_tenths, nine_tenths)]
-        test = range(half, six_tenths) if use_dev else range(nine_tenths, count)
-        train = np.concatenate(train)
-    elif dataset == 3:
+        train, test = split_dataset(images, labels, use_dev)
+    elif dataset == "both":
         images1 = np.load(IMAGES1)[:-130]
         labels1 = np.load(LABELS1)[:-130]
         images2 = np.load(IMAGES2)
         labels2 = np.load(LABELS2)
+        train1, test1 = split_dataset(images1, labels1, use_dev)
+        train2, test2 = split_dataset(images2, labels2, use_dev)
 
         images = np.concatenate([images1, images2])
         labels = np.concatenate([labels1, labels2])
-
-        count1 = len(images1)
-        split1 = count1 // 10 * 9
-        count2 = len(images2)
-        split2 = count2 // 10 * 9
-
-        train = [range(split1), range(count1, count1+split2)]
-        test = [range(split1, count1), range(count1+split2, count1+count2)]
-        train = np.concatenate(train)
-        test = np.concatenate(test)
+        train = train1 + train2
+        test = test1 + test2
     else:
-        raise ValueError
+        raise ValueError("Invalid dataset name")
+
+    train = np.concatenate(train)
+    test = np.concatenate(test)
+
     if rem_noise:
         for i, frame in enumerate(labels):
             labels[i] = remove_noise(frame)
+
     return images, labels, train, test
 
-def get_all_data():
-    # throw out garbage labels at the end
-    images1 = np.load(IMAGES1)[:-130]
-    labels1 = np.load(LABELS1)[:-130]
-    images2 = np.load(IMAGES2)
-    labels2 = np.load(LABELS2)
+# def get_all_data():
+#     # throw out garbage labels at the end
+#     images1 = np.load(IMAGES1)[:-130]
+#     labels1 = np.load(LABELS1)[:-130]
+#     images2 = np.load(IMAGES2)
+#     labels2 = np.load(LABELS2)
 
-    images = np.concatenate([images1, images2])
-    labels = np.concatenate([labels1, labels2])
+#     images = np.concatenate([images1, images2])
+#     labels = np.concatenate([labels1, labels2])
 
-    count1 = len(images1)
-    split1 = count1 // 10 * 9
-    count2 = len(images2)
-    split2 = count2 // 10 * 9
+#     count1 = len(images1)
+#     split1 = count1 // 10 * 9
+#     count2 = len(images2)
+#     split2 = count2 // 10 * 9
 
-    train_ranges = [range(split1), range(count1, count1+split2)]
-    test_ranges = [range(split1, count1), range(count1+split2, count1+count2)]
+#     train_ranges = [range(split1), range(count1, count1+split2)]
+#     test_ranges = [range(split1, count1), range(count1+split2, count1+count2)]
 
-    return images, labels, train_ranges, test_ranges
+#     return images, labels, train_ranges, test_ranges
 
 def remove_noise(img, size=3, it=4):
     original_type = img.dtype

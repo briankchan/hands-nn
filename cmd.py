@@ -111,7 +111,7 @@ def parse_args():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("model", default="cnn")
-    parser.add_argument("dataset", default=1, choices=[0, 1, 2], type=int)
+    parser.add_argument("dataset", default="small")
     parser.add_argument("--remove_noise", action="store_true")
     parser.add_argument("--save", action="store_true") # mutally exclude save/load path?
     parser.add_argument("--load", default=argparse.SUPPRESS, type=int)
