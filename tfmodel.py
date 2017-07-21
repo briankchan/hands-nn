@@ -1,4 +1,6 @@
 import random
+import time
+from math import ceil
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
@@ -95,22 +97,26 @@ class TFModel(Model, metaclass=ABCMeta):
             batch_size = self.batch_size
 
         writer = tf.summary.FileWriter(self.log_path, self.graph)
+        num_batches = ceil(len(indices) / self.batch_size)
 
-        for epoch in range(epochs):
-            print("===============")
-            print("EPOCH", epoch+1)
-            print("===============")
-
+        for epoch in range(1, epochs+1):
             random.shuffle(indices)
             batches = chunks(indices, batch_size)
+            start = time.time()
 
             for i, frames in enumerate(batches, 1):
-                if i % 10 == 0:
-                    print("batch", i)
                 # _, losses = self.session.run([train_op, tf.get_collection('losses')],
                 summary, _ = self.session.run([self.summary, self.optimizer],
                                               {self.images: images[frames], self.target_labels: labels[frames]})
                 writer.add_summary(summary, tf.train.global_step(self.session, self.step))
+                if i % 10 == 0 or i == num_batches:
+                    print("Epoch {}: batch {} of {} | {:.3f}s".format(
+                        epoch,
+                        i,
+                        num_batches,
+                        time.time() - start), end="\r")
+            print()
+
         writer.close()
 
     def predict(self, images, indices=None):
