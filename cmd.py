@@ -99,11 +99,16 @@ def main(model, dataset, use_dev=True, remove_noise=False, save=False, load=None
         print("Training model")
         m.train(IMAGES, LABELS, TRAIN)
         if save:
-            print("Saving model")
+            print("Saving run {}".format(m.run_num))
             m.save(path)
     else:
-        print("Loading model")
-        m = model.load(None if load == -1 else load, path)
+        if load == -1:
+            print("Loading run ", end="")
+            m = model.load(None, path)
+            print(m.run_num)
+        else:
+            print("Loading run {}".format(load))
+            m = model.load(load, path)
     print("Testing model")
     return m.test(IMAGES, LABELS, TEST)
 

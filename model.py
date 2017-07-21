@@ -14,6 +14,10 @@ class Model(metaclass=ABCMeta):
     _base_log_path = "runs"
 
     @property
+    def run_num(self):
+        return self._run_num
+
+    @property
     @classmethod
     @abstractmethod
     def _class_log_path_pattern(self):
@@ -30,7 +34,7 @@ class Model(metaclass=ABCMeta):
         return log_path_pattern.format(run_num)
 
     def _get_log_path(self):
-        return self._format_log_path(self.run_num)
+        return self._format_log_path(self._run_num)
 
     @abstractmethod
     def __init__(self, run_num=None):
@@ -43,7 +47,7 @@ class Model(metaclass=ABCMeta):
 
     def reset(self):
         self._reset_model()
-        self.run_num = self._get_next_run_num()
+        self._run_num = self._get_next_run_num()
         self.log_path = self._get_log_path()
 
     @abstractmethod
@@ -90,7 +94,7 @@ class Model(metaclass=ABCMeta):
         elif os.path.exists(path_pattern):
             path = path_pattern
         else:
-            path = self._format_log_path(self.run_num, path_pattern)
+            path = self._format_log_path(self._run_num, path_pattern)
         self._save_args(path)
         self._save_model(path)
 
@@ -141,7 +145,7 @@ class Model(metaclass=ABCMeta):
 
     def _load_run(self, run_num=None, path_pattern=None):
         path = self._get_load_path(run_num, path_pattern)
-        # self.run_num = run_num
+        # self._run_num = run_num
         self.log_path = path
         self._load_model(path)
 
