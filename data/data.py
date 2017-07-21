@@ -88,8 +88,8 @@ def get_dataset(dataset, use_dev=True, rem_noise=False):
     else:
         raise ValueError
     if rem_noise:
-        for i, image in enumerate(images):
-            images[i] = remove_noise(image)
+        for i, frame in enumerate(labels):
+            labels[i] = remove_noise(frame)
     return images, labels, train, test
 
 def get_all_data():

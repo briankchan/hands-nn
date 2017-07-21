@@ -95,7 +95,7 @@ class Model(metaclass=ABCMeta):
         self._save_model(path)
 
     def _save_args(self, path):
-        with open(os.path.join(path, self._args_filename), "w") as f:
+        with open(os.path.join(path, self._args_filename), "wb") as f:
             pickle.dump(self._args, f)
 
     @abstractmethod
@@ -113,7 +113,7 @@ class Model(metaclass=ABCMeta):
 
     @classmethod
     def _get_load_path(cls, run_num=None, path_pattern=None):
-        if os.path.exists(path_pattern):
+        if path_pattern is not None and os.path.exists(path_pattern):
             # load pathect path
             return path_pattern
         
@@ -136,7 +136,7 @@ class Model(metaclass=ABCMeta):
     @classmethod
     def _load_args(cls, run_num=None, path_pattern=None):
         path = cls._get_load_path(run_num, path_pattern)
-        with open(os.path.join(path, cls._args_filename), "r") as f:
+        with open(os.path.join(path, cls._args_filename), "rb") as f:
             return pickle.load(f)
 
     def _load_run(self, run_num=None, path_pattern=None):
