@@ -4,8 +4,9 @@ import glob
 from abc import ABCMeta, abstractmethod
 import inspect
 import functools
+
 import numpy as np
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.metrics import confusion_matrix
 from misc import chunks, classproperty
 
 class Model(metaclass=ABCMeta):
@@ -145,7 +146,10 @@ class Model(metaclass=ABCMeta):
 
     def _load_run(self, run_num=None, path_pattern=None):
         path = self._get_load_path(run_num, path_pattern)
-        # self._run_num = run_num
+        if run_num is None:
+            self._run_num -= 1
+        else:
+            self._run_num = run_num
         self.log_path = path
         self._load_model(path)
 
