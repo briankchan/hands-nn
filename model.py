@@ -6,7 +6,7 @@ import inspect
 import functools
 
 import numpy as np
-from sklearn.metrics import confusion_matrix
+# from sklearn.metrics import confusion_matrix
 from misc import chunks, classproperty
 
 class Model(metaclass=ABCMeta):
@@ -165,31 +165,33 @@ class Model(metaclass=ABCMeta):
     def predict(self, input, indices):
         pass
 
+    @abstractmethod
     def test(self, input, expected, indices):
-        if indices is None:
-            indices = range(len(input))
-        else:
-            indices = np.r_[tuple(indices)]
-            expected = expected[indices]
+        pass
+        # if indices is None:
+        #     indices = range(len(input))
+        # else:
+        #     indices = np.r_[tuple(indices)]
+        #     expected = expected[indices]
 
-        pred = self.predict(input, indices)
+        # pred = self.predict(input, indices)
 
-        pred_flat = pred.flatten()
-        exp_flat = expected.flatten()
+        # pred_flat = pred.flatten()
+        # exp_flat = expected.flatten()
 
-        conf_mat = confusion_matrix(exp_flat, pred_flat)
-        accuracy = conf_mat.diagonal().sum() / conf_mat.sum()
-        precision = conf_mat[1,1] / conf_mat[:,1].sum()
-        recall = conf_mat[1,1] / conf_mat[1].sum()
-        f1 = 0 if precision == 0 and recall == 0\
-             else 2 * precision * recall / (precision + recall)
-        print("Accuracy:", accuracy)
-        print("Precision:", precision)
-        print("Recall:", recall)
-        print("F1 score:", f1)
-        print("Confusion matrix")
-        print(conf_mat)
-        return pred
+        # conf_mat = confusion_matrix(exp_flat, pred_flat)
+        # accuracy = conf_mat.diagonal().sum() / conf_mat.sum()
+        # precision = conf_mat[1,1] / conf_mat[:,1].sum()
+        # recall = conf_mat[1,1] / conf_mat[1].sum()
+        # f1 = 0 if precision == 0 and recall == 0\
+        #      else 2 * precision * recall / (precision + recall)
+        # print("Accuracy:", accuracy)
+        # print("Precision:", precision)
+        # print("Recall:", recall)
+        # print("F1 score:", f1)
+        # print("Confusion matrix")
+        # print(conf_mat)
+        # return pred
 
 
 def save_args(method):

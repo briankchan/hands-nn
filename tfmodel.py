@@ -37,6 +37,8 @@ class TFModel(Model, metaclass=ABCMeta):
                 self.loss = self._build_loss(self.logits, self.target_labels, self.pos_weight)
                 self.optimizer = self._build_optimizer(self.loss, self.rate, self.epsilon, self.step)
 
+                self.confusion_matrix = self._build_evaluator(self.target_labels, self.pred_labels)
+
                 self.reset()
 
                 self.summary = tf.summary.merge_all()
@@ -76,6 +78,11 @@ class TFModel(Model, metaclass=ABCMeta):
         with tf.name_scope("optimizer"):
             optimizer = tf.train.AdamOptimizer(learning_rate=rate, epsilon=epsilon)
             return optimizer.minimize(loss, global_step=step, name="optimize")
+
+    def _build_evaluator(self, target, predicted):
+        target_flat = tf.reshape(target, [-1])
+        predicted_flat = tf.reshape(predicted, [-1])
+        return tf.confusion_matrix(target_flat, predicted_flat)
 
     def _reset_model(self):
         with self.graph.as_default():
@@ -127,9 +134,45 @@ class TFModel(Model, metaclass=ABCMeta):
         images = images[indices]
         # pred like images, but only 1 channel ([count, h, w] vs [count, h, w, rgb=3])
         pred = np.empty(images.shape[:-1], dtype=np.bool)
+        start = time.time()
+        # batches = chunks(indices, self.batch_size)
         for i, image in enumerate(images):
             pred[i] = self.session.run(self.pred_labels,
                                        {self.images: [image]})[0]
+        print("done in {}s".format(time.time() - start))
+        return pred
+
+    def test(self, images, expected, indices):
+        if indices is None:
+            indices = range(len(input))
+        else:
+            indices = np.r_[tuple(indices)]
+
+        batch_size = 3  # for some reason this runs faster than larger batch sizes
+
+        # images shape: [count, h, w, rgb=3]; use h and w from image
+        pred = np.empty((len(indices), images.shape[1], images.shape[2]), dtype=np.bool)
+        batches = chunks(indices, batch_size)
+        conf_mat = np.zeros([2, 2], dtype=np.int)
+
+        for i, batch in enumerate(batches):
+            s = i * batch_size
+            pred[s:s+batch_size], cf = self.session.run(
+                [self.pred_labels, self.confusion_matrix],
+                {self.images: images[batch], self.target_labels: expected[batch]})
+            conf_mat += cf
+
+        accuracy = conf_mat.diagonal().sum() / conf_mat.sum()
+        precision = conf_mat[1,1] / conf_mat[:,1].sum()
+        recall = conf_mat[1,1] / conf_mat[1].sum()
+        f1 = 0 if precision == 0 and recall == 0\
+             else 2 * precision * recall / (precision + recall)
+        print("Accuracy:", accuracy)
+        print("Precision:", precision)
+        print("Recall:", recall)
+        print("F1 score:", f1)
+        print("Confusion matrix")
+        print(conf_mat)
         return pred
 
     def _save_model(self, path):
