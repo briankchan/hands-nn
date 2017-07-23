@@ -162,11 +162,11 @@ class Model(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def predict(self, input, indices):
+    def predict(self, input, indices=None, batch_size=None):
         pass
 
     @abstractmethod
-    def test(self, input, expected, indices):
+    def test(self, input, expected, indices=None, batch_size=None):
         pass
         # if indices is None:
         #     indices = range(len(input))

@@ -21,7 +21,6 @@ class TFModel(Model, metaclass=ABCMeta):
                  epsilon=1e-8,
                  pos_weight=10):
         super().__init__()
-        # batch size, epochs, train stuff, height/width, depth, pos weight...
 
     def _build_model(self):
         self.config = tf.ConfigProto(allow_soft_placement=True)  # log_device_placement=True
@@ -82,7 +81,7 @@ class TFModel(Model, metaclass=ABCMeta):
     def _build_evaluator(self, target, predicted):
         target_flat = tf.reshape(target, [-1])
         predicted_flat = tf.reshape(predicted, [-1])
-        return tf.confusion_matrix(target_flat, predicted_flat)
+        return tf.confusion_matrix(target_flat, predicted_flat, num_classes=2)
 
     def _reset_model(self):
         with self.graph.as_default():
@@ -126,29 +125,12 @@ class TFModel(Model, metaclass=ABCMeta):
 
         writer.close()
 
-    def predict(self, images, indices=None):
+    def predict(self, images, indices=None, batch_size=3):
+        # for some reason batch size 3 runs faster than larger batch sizes
         if indices is None:
             indices = range(len(images))
         else:
             indices = np.r_[tuple(indices)]
-        images = images[indices]
-        # pred like images, but only 1 channel ([count, h, w] vs [count, h, w, rgb=3])
-        pred = np.empty(images.shape[:-1], dtype=np.bool)
-        start = time.time()
-        # batches = chunks(indices, self.batch_size)
-        for i, image in enumerate(images):
-            pred[i] = self.session.run(self.pred_labels,
-                                       {self.images: [image]})[0]
-        print("done in {}s".format(time.time() - start))
-        return pred
-
-    def test(self, images, expected, indices):
-        if indices is None:
-            indices = range(len(input))
-        else:
-            indices = np.r_[tuple(indices)]
-
-        batch_size = 3  # for some reason this runs faster than larger batch sizes
 
         # images shape: [count, h, w, rgb=3]; use h and w from image
         pred = np.empty((len(indices), images.shape[1], images.shape[2]), dtype=np.bool)
@@ -156,8 +138,28 @@ class TFModel(Model, metaclass=ABCMeta):
         conf_mat = np.zeros([2, 2], dtype=np.int)
 
         for i, batch in enumerate(batches):
-            s = i * batch_size
-            pred[s:s+batch_size], cf = self.session.run(
+            start = i * batch_size
+            pred[start:start+batch_size] = self.session.run(
+                self.pred_labels,
+                {self.images: images[batch]})
+
+        return pred
+
+    def test(self, images, expected, indices=None, batch_size=3):
+        # for some reason batch size 3 runs faster than larger batch sizes
+        if indices is None:
+            indices = range(len(input))
+        else:
+            indices = np.r_[tuple(indices)]
+
+        # images shape: [count, h, w, rgb=3]; use h and w from image
+        pred = np.empty((len(indices), images.shape[1], images.shape[2]), dtype=np.bool)
+        batches = chunks(indices, batch_size)
+        conf_mat = np.zeros([2, 2], dtype=np.int)
+
+        for i, batch in enumerate(batches):
+            start = i * batch_size
+            pred[start:start+batch_size], cf = self.session.run(
                 [self.pred_labels, self.confusion_matrix],
                 {self.images: images[batch], self.target_labels: expected[batch]})
             conf_mat += cf
