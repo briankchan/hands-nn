@@ -5,6 +5,7 @@ from abc import ABCMeta, abstractmethod
 
 import numpy as np
 import tensorflow as tf
+from scipy.stats import hmean
 
 from model import Model, save_args
 from misc import chunks
@@ -168,8 +169,7 @@ class TFModel(Model, metaclass=ABCMeta):
         accuracy = conf_mat.diagonal().sum() / conf_mat.sum()
         precision = conf_mat[1,1] / conf_mat[:,1].sum()
         recall = conf_mat[1,1] / conf_mat[1].sum()
-        f1 = 0 if precision == 0 and recall == 0\
-             else 2 * precision * recall / (precision + recall)
+        f1 = 0 if precision == 0 or recall == 0 else hmean((precision, recall))
         print("Accuracy:", accuracy)
         print("Precision:", precision)
         print("Recall:", recall)
