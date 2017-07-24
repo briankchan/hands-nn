@@ -132,13 +132,13 @@ class CNN(TFModel):
                     kernel_regularizer=tf.contrib.layers.l2_regularizer(regularization_scale),
                     activation=None)
 
-            tf.contrib.layers.summarize_activations()
-            # tf.contrib.layers.summarize_variables()
-            # tf.contrib.layers.summarize_weights()
-            # tf.contrib.layers.summarize_biases()
-            tf.contrib.layers.summarize_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-            tf.contrib.layers.summarize_collection(tf.GraphKeys.WEIGHTS)
-            tf.contrib.layers.summarize_collection(tf.GraphKeys.BIASES)
+            # tf.contrib.layers.summarize_activations()
+            # # tf.contrib.layers.summarize_variables()
+            # # tf.contrib.layers.summarize_weights()
+            # # tf.contrib.layers.summarize_biases()
+            # tf.contrib.layers.summarize_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+            # tf.contrib.layers.summarize_collection(tf.GraphKeys.WEIGHTS)
+            # tf.contrib.layers.summarize_collection(tf.GraphKeys.BIASES)
 
             # print(input_layer.shape)
             # print(1)
