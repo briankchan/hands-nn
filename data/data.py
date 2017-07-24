@@ -1,4 +1,4 @@
-import math
+from math import ceil
 import numpy as np
 import cv2
 from misc import chunks
@@ -17,19 +17,35 @@ LABELS2 = DATA2 + "-labels.npy"
 # small dataset for testing; made global for convenience
 IMG, LAB, TRAIN, TEST = [None] * 4
 
-def split(ranges, test_chunks, num_chunks):
-    test_indices = []
-    train_indices = []
-    for indices in ranges:
-        chunk_size = math.ceil(len(indices) / num_chunks)
-        chunks = np.array(list(chunks(indices, chunk_size)))
-        test_indices += chunks[test_chunks].tolist()
-        train_indices += np.delete(chunks, test_chunks, axis=0).tolist()
+# def split(ranges, test_chunks, num_chunks):
+#     test_indices = []
+#     train_indices = []
+#     for indices in ranges:
+#         chunk_size = ceil(len(indices) / num_chunks)
+#         chunks = np.array(list(chunks(indices, chunk_size)))
+#         test_indices += chunks[test_chunks].tolist()
+#         train_indices += np.delete(chunks, test_chunks, axis=0).tolist()
+#
+#     test_indices = np.concatenate(test_indices)
+#     train_indices = np.concatenate(train_indices)
+#
+#     return train_indices, test_indices
 
-    test_indices = np.concatenate(test_indices)
-    train_indices = np.concatenate(train_indices)
+def split(count, use_dev=True, num_chunks=10, dev_chunks=5, test_chunks=9):
+    if dev_chunks is list:
+        dev_chunks = tuple(dev_chunks)
+    if test_chunks is list:
+        test_chunks = tuple(test_chunks)
+    dev_chunks = np.r_[dev_chunks]
+    test_chunks = np.r_[test_chunks]
 
-    return train_indices, test_indices
+    both = np.r_[dev_chunks, test_chunks]
+    size = ceil(count / num_chunks)
+    slices = np.array([slice(i, i+size) for i in range(0, count, size)])
+    
+    train = np.delete(slices, both)
+    test = slices[dev_chunks if use_dev else test_chunks]
+    return train, test
 
 def get_small_dataset():
     global IMG, LAB, TRAIN, TEST
@@ -50,60 +66,62 @@ def split_dataset(images, labels, use_dev=True):
     test = [range(half, six_tenths) if use_dev else range(nine_tenths, count)]
     return train, test
 
-def get_dataset(dataset, use_dev=True, rem_noise=False):
+def get_dataset(dataset, use_dev=True, rem_noise=False, cross_validate=False):
     if dataset == "small":
         images, labels, train, test = get_small_dataset()
     elif dataset == "1":
         images = np.load(IMAGES1)[:-130]
         labels = np.load(LABELS1)[:-130]
-        train, test = split_dataset(images, labels, use_dev)
+        if cross_validate:
+            train = []
+            test = []
+            for i in range(9):
+                tr, ts = split(len(images), use_dev, dev_chunks=i)
+                train.append(tr)
+                test.append(ts)
+        else:
+            train, test = split(len(images), use_dev)
     elif dataset == "2":
         images = np.load(IMAGES2)
         labels = np.load(LABELS2)
-        train, test = split_dataset(images, labels, use_dev)
+        if cross_validate:
+            train = []
+            test = []
+            for i in range(9):
+                tr, ts = split(len(images), use_dev, dev_chunks=i)
+                train.append(tr)
+                test.append(ts)
+        else:
+            train, test = split(len(images), use_dev)
     elif dataset == "both":
         images1 = np.load(IMAGES1)[:-130]
         labels1 = np.load(LABELS1)[:-130]
         images2 = np.load(IMAGES2)
         labels2 = np.load(LABELS2)
-        train1, test1 = split_dataset(images1, labels1, use_dev)
-        train2, test2 = split_dataset(images2, labels2, use_dev)
-
         images = np.concatenate([images1, images2])
         labels = np.concatenate([labels1, labels2])
-        train = train1 + train2
-        test = test1 + test2
+
+        if cross_validate:
+            train = []
+            test = []
+            for i in range(9):
+                tr1, ts1 = split(len(images1), use_dev, dev_chunks=i)
+                tr2, ts2 = split(len(images2), use_dev, dev_chunks=i)
+                train.append(np.concatenate([tr1, tr2]))
+                test.append(np.concatenate([ts1, ts2]))
+        else:
+            train1, test1 = split(len(images1), use_dev)
+            train2, test2 = split(len(images2), use_dev)
+            train = np.concatenate([train1, train2])
+            test = np.concatenate([test1, test2])
     else:
         raise ValueError("Invalid dataset name")
-
-    train = np.concatenate(train)
-    test = np.concatenate(test)
 
     if rem_noise:
         for i, frame in enumerate(labels):
             labels[i] = remove_noise(frame)
 
     return images, labels, train, test
-
-# def get_all_data():
-#     # throw out garbage labels at the end
-#     images1 = np.load(IMAGES1)[:-130]
-#     labels1 = np.load(LABELS1)[:-130]
-#     images2 = np.load(IMAGES2)
-#     labels2 = np.load(LABELS2)
-
-#     images = np.concatenate([images1, images2])
-#     labels = np.concatenate([labels1, labels2])
-
-#     count1 = len(images1)
-#     split1 = count1 // 10 * 9
-#     count2 = len(images2)
-#     split2 = count2 // 10 * 9
-
-#     train_ranges = [range(split1), range(count1, count1+split2)]
-#     test_ranges = [range(split1, count1), range(count1+split2, count1+count2)]
-
-#     return images, labels, train_ranges, test_ranges
 
 def remove_noise(img, size=3, it=4):
     original_type = img.dtype

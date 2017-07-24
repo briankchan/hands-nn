@@ -176,7 +176,13 @@ class TFModel(Model, metaclass=ABCMeta):
         print("F1 score:", f1)
         print("Confusion matrix")
         print(conf_mat)
-        return pred
+        return pred, {
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "confusion_matrix": conf_mat
+        }
 
     def _save_model(self, path):
         self.saver.save(self.session, path+"/model.ckpt")
