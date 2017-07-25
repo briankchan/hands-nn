@@ -2,6 +2,8 @@ import importlib
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider
+
 import data
 # from data.data import split
 
@@ -46,7 +48,7 @@ def imshow(img):
     plt.imshow(img)
     plt.show()
 
-def labshow(labels, i, images=None, truth=None, test_indices=None):
+def labshow(labels, i=0, images=None, truth=None, test_indices=None):
     if images is None:
         images = IMAGES
     if truth is None:
@@ -54,6 +56,31 @@ def labshow(labels, i, images=None, truth=None, test_indices=None):
     if test_indices is None:
         test_indices = TEST
     imshow(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
+
+def interactive_labshow(labels, i=0, images=None, truth=None, test_indices=None):
+    if images is None:
+        images = IMAGES
+    if truth is None:
+        truth = LABELS
+    if test_indices is None:
+        test_indices = TEST
+    test_indices = np.r_[tuple(test_indices)]
+
+    fig, ax = plt.subplots()
+    plt.subplots_adjust(left = 0.25, bottom = 0.25)
+    l = plt.imshow(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
+
+    time_ax = plt.axes([0.25, 0.1, 0.65, 0.03])
+
+    time_sld = Slider(time_ax, "Frame", 0, 100, valinit=i, closedmax=False, valfmt="%d")
+
+    def update(i):
+        i = int(i)
+        l.set_data(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
+        fig.canvas.draw_idle()
+
+    time_sld.on_changed(update)
+    plt.show()
 
 def parse_extra_args(args):
     output = {}
@@ -95,6 +122,7 @@ def main(model, dataset,
          load=None,
          path=None,
          cross_validate=False,
+         show=True,
          **model_args):
     global IMAGES, LABELS, TRAIN, TEST
     print("Loading data")
@@ -153,10 +181,29 @@ def main(model, dataset,
                 print("Loading run {}".format(load))
                 m = model.load(load, path)
         print("Testing model")
-        return m.test(IMAGES, LABELS, TEST)
+        pred, stats = m.test(IMAGES, LABELS, TEST)
+        if show:
+            interactive_labshow(pred, images=IMAGES, truth=LABELS, test_indices=TEST)
+        return pred, stats
 
-def parse_args():
+
+def parse_args(args=None):
     import argparse
+    # class CustomStoreFalse(argparse.Action):
+    #     def __init__(self, dest=None, nargs=0, **kw):
+    #         self.dest = dest[3:]  # cut out "no-"
+    #         print(self.dest)
+    #         super().__init__(dest=self.dest, default=True, nargs=nargs, **kw)
+    #
+    #     def __call__(self, parser, namespace, values,
+    #                  option_string=None):
+    #         # dest = option_string[3:]  # cut out "no-"
+    #         setattr(namespace, self.dest, False)
+
+    class CustomStoreFalse(argparse._StoreFalseAction):
+        def __init__(self, dest=None, **kw):
+            super().__init__(dest=dest[3:], **kw)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("model", default="cnn")
     parser.add_argument("dataset", default="small")
@@ -165,7 +212,8 @@ def parse_args():
     parser.add_argument("--load", default=argparse.SUPPRESS, type=int)
     parser.add_argument("--path")
     parser.add_argument("--cross-validate", action="store_true")
-    args, extra = parser.parse_known_args()
+    parser.add_argument("--no-show", action=CustomStoreFalse)
+    args, extra = parser.parse_known_args(args)
     model_args = parse_extra_args(extra)
     all_args = vars(args)
     all_args.update(model_args)
