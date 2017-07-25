@@ -68,18 +68,29 @@ def interactive_labshow(labels, i=0, images=None, truth=None, test_indices=None)
 
     fig, ax = plt.subplots()
     plt.subplots_adjust(left = 0.25, bottom = 0.25)
-    l = plt.imshow(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
+    img_ax = plt.imshow(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
 
     time_ax = plt.axes([0.25, 0.1, 0.65, 0.03])
 
-    time_sld = Slider(time_ax, "Frame", 0, 100, valinit=i, closedmax=False, valfmt="%d")
+    time_sld = Slider(time_ax, "Frame", 0, len(test_indices) - .01, valinit=i, valfmt="%d")
 
     def update(i):
         i = int(i)
-        l.set_data(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
+        img_ax.set_data(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
         fig.canvas.draw_idle()
 
+    def onkeypress(event):
+        if event.key == "left":
+            time_sld.set_val(max(time_sld.val - 1, time_sld.valmin))
+        elif event.key == "right":
+            time_sld.set_val(min(time_sld.val + 1, time_sld.valmax))
+        elif event.key == "home":
+            time_sld.set_val(time_sld.valmin)
+        elif event.key == "end":
+            time_sld.set_val(time_sld.valmax)
+
     time_sld.on_changed(update)
+    fig.canvas.mpl_connect("key_press_event", onkeypress)
     plt.show()
 
 def parse_extra_args(args):
@@ -189,16 +200,6 @@ def main(model, dataset,
 
 def parse_args(args=None):
     import argparse
-    # class CustomStoreFalse(argparse.Action):
-    #     def __init__(self, dest=None, nargs=0, **kw):
-    #         self.dest = dest[3:]  # cut out "no-"
-    #         print(self.dest)
-    #         super().__init__(dest=self.dest, default=True, nargs=nargs, **kw)
-    #
-    #     def __call__(self, parser, namespace, values,
-    #                  option_string=None):
-    #         # dest = option_string[3:]  # cut out "no-"
-    #         setattr(namespace, self.dest, False)
 
     class CustomStoreFalse(argparse._StoreFalseAction):
         def __init__(self, dest=None, **kw):
