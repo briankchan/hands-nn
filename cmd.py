@@ -57,6 +57,10 @@ def vidshow(func, max, start=0):
             time_sld.set_val(max(time_sld.val - 1, time_sld.valmin))
         elif event.key == "right":
             time_sld.set_val(min(time_sld.val + 1, time_sld.valmax))
+        elif event.key == "ctrl+left":
+            time_sld.set_val(max(time_sld.val - 30, time_sld.valmin))
+        elif event.key == "ctrl+right":
+            time_sld.set_val(min(time_sld.val + 30, time_sld.valmax))
         elif event.key == "home":
             time_sld.set_val(time_sld.valmin)
         elif event.key == "end":
@@ -128,6 +132,10 @@ def labshow(labels, i=0, images=None, truth=None, test_indices=None):
             time_sld.set_val(max(time_sld.val - 1, time_sld.valmin))
         elif event.key == "right":
             time_sld.set_val(min(time_sld.val + 1, time_sld.valmax))
+        elif event.key == "ctrl+left":
+            time_sld.set_val(max(time_sld.val - 30, time_sld.valmin))
+        elif event.key == "ctrl+right":
+            time_sld.set_val(min(time_sld.val + 30, time_sld.valmax))
         elif event.key == "home":
             time_sld.set_val(time_sld.valmin)
         elif event.key == "end":
