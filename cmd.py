@@ -2,47 +2,37 @@ import importlib
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider
+from matplotlib import gridspec
+from matplotlib.widgets import Slider, CheckButtons
 
 import data
-# from data.data import split
 
 IMAGES, LABELS, TRAIN, TEST = [None] * 4
-
-# def split_run_save(images, labels, train, test, *args, **kwargs):
-#     train, val = split(train, [5], 9)
-#     pred = run(images, labels, train, test, *args, **kwargs)
-#     m.save()
-#     return pred
-#
-# def split_and_run(images, labels, test_chunks, num_chunks=9, ranges=None, *args, **kwargs):
-#     if ranges is None:
-#         ranges = [range(len(images))]
-#
-#     train_indices, test_indices = split(ranges, test_chunks, num_chunks)
-#
-#     return run(images, labels, train_indices, test_indices, *args, **kwargs), test_indices
-#
-# def randsplit_and_run(images, labels, num_chunks=9, num_test_chunks=1, ranges=None, *args, **kwargs):
-#     test_chunks = np.random.choice(range(num_chunks), num_test_chunks, replace=False)
-#     return split_and_run(images, labels, test_chunks, num_chunks, ranges, *args, **kwargs)
 
 def side_concat(img, lab):
     a = img
     b = (lab * 255).repeat(3).reshape(480, 640, 3).astype(np.uint8)
     return np.concatenate((a, b), axis=1)
 
-def overlay(img, lab, truth=None):
-    img = np.copy(img)
-    img[lab, 0] = 255
-    img[lab, 1:] //= 2
-
-    if truth is not None:
+def overlay(img, lab=None, truth=None):
+    if lab is None:
+        if truth is None:
+            return img
+        img = np.copy(img)
         img[truth, 2] = 255
+        img[truth, :2] //= 2
+        return img
+    else:
+        img = np.copy(img)
+        img[lab, 0] = 255
+        img[lab, 1:] //= 2
 
-        intersection = truth*lab
-        img[truth^intersection, :2] //= 2
-    return img
+        if truth is not None:
+            img[truth, 2] = 255
+
+            intersection = truth*lab
+            img[truth^intersection, :2] //= 2
+        return img
 
 def imshow(img):
     plt.imshow(img)
@@ -98,15 +88,7 @@ def compare_runs(i1, i2, model, dataset, remove_noise=False, model2=None, datase
             ], axis=1),
             len(test_indices1))
 
-# def labshow(labels, i=0, images=None, truth=None, test_indices=None):
-#     if images is None:
-#         images = IMAGES
-#     if truth is None:
-#         truth = LABELS
-#     if test_indices is None:
-#         test_indices = TEST
-#     imshow(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
-
+GRID_SIZE = 9
 def labshow(labels, i=0, images=None, truth=None, test_indices=None):
     if images is None:
         images = IMAGES
@@ -116,18 +98,30 @@ def labshow(labels, i=0, images=None, truth=None, test_indices=None):
         test_indices = TEST
     test_indices = np.r_[tuple(test_indices)]
 
-    fig, ax = plt.subplots()
-    plt.subplots_adjust(left = 0.25, bottom = 0.25)
-    img_ax = plt.imshow(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
+    gs = gridspec.GridSpec(GRID_SIZE, GRID_SIZE)
+    fig = plt.figure()
+    main_ax = fig.add_subplot(gs[:-1, 1:])
+    fig.tight_layout()
+    img_ax = main_ax.imshow(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
 
-    time_ax = plt.axes([0.25, 0.1, 0.65, 0.03])
-
+    time_ax = fig.add_subplot(gs[-1, 1:-1])
     time_sld = Slider(time_ax, "Frame", 0, len(test_indices) - .01, valinit=i, valfmt="%d")
 
-    def update(i):
-        i = int(i)
-        img_ax.set_data(overlay(images[test_indices[i]], labels[i], truth[test_indices[i]]))
+    half = GRID_SIZE // 2
+    selector_ax = fig.add_subplot(gs[half-2:half, 0])
+    selector_chk = CheckButtons(selector_ax, ["Pred", "Truth"], [True, True])
+
+    def update(_):
+        i = int(time_sld.val)
+        selected = [l1.get_visible() for l1, l2 in selector_chk.lines]
+        # checkbuttons.get_status() is supposed to exist, but doesn't?
+        img_ax.set_data(overlay(
+            images[test_indices[i]],
+            labels[i] if selected[0] else None,
+            truth[test_indices[i]] if selected[1] else None))
         fig.canvas.draw_idle()
+    time_sld.on_changed(update)
+    selector_chk.on_clicked(update)
 
     def onkeypress(event):
         if event.key == "left":
@@ -138,9 +132,8 @@ def labshow(labels, i=0, images=None, truth=None, test_indices=None):
             time_sld.set_val(time_sld.valmin)
         elif event.key == "end":
             time_sld.set_val(time_sld.valmax)
-
-    time_sld.on_changed(update)
     fig.canvas.mpl_connect("key_press_event", onkeypress)
+
     plt.show()
 
 def parse_extra_args(args):
