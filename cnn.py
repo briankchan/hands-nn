@@ -13,6 +13,9 @@ class CNN(TFModel):
                  width=640,
                  height=480,
                  depth=3,
+                 regular_conv_layers=2,
+                 large_conv_size=17,
+                 large_conv_filters=32,
                  epochs=1,
                  batch_size=12,
                  rate=0.0001,
@@ -54,40 +57,52 @@ class CNN(TFModel):
                     activation=misc.prelu)
                 pool2 = tf.layers.max_pooling2d(name="pool2", inputs=conv2, pool_size=2, strides=2)
 
-            # Convolutional Layer #3 and Pooling Layer #3
-            with tf.name_scope("conv_3"):
-                conv3 = tf.layers.conv2d(
-                    name="conv3",
-                    inputs=pool2,
-                    filters=32,
-                    kernel_size=5,
-                    padding="same",
-                    activation=misc.prelu)
-                pool3 = tf.layers.max_pooling2d(name="pool3", inputs=conv3, pool_size=2, strides=1, padding="same")
-
-            # Convolutional Layer #4 and Pooling Layer #4
-            with tf.name_scope("conv_4"):
-                conv4 = tf.layers.conv2d(
-                    name="conv4",
-                    inputs=pool3,
-                    filters=32,
-                    kernel_size=5,
-                    padding="same",
-                    kernel_regularizer=tf.contrib.layers.l2_regularizer(regularization_scale),
-                    activation=misc.prelu)
-                pool4 = tf.layers.max_pooling2d(name="pool4", inputs=conv4, pool_size=2, strides=1, padding="same")
+            # # Convolutional Layer #3 and Pooling Layer #3
+            # with tf.name_scope("conv_3"):
+            #     conv3 = tf.layers.conv2d(
+            #         name="conv3",
+            #         inputs=pool2,
+            #         filters=32,
+            #         kernel_size=5,
+            #         padding="same",
+            #         activation=misc.prelu)
+            #     pool3 = tf.layers.max_pooling2d(name="pool3", inputs=conv3, pool_size=2, strides=1, padding="same")
+            #
+            # # Convolutional Layer #4 and Pooling Layer #4
+            # with tf.name_scope("conv_4"):
+            #     conv4 = tf.layers.conv2d(
+            #         name="conv4",
+            #         inputs=pool3,
+            #         filters=32,
+            #         kernel_size=5,
+            #         padding="same",
+            #         kernel_regularizer=tf.contrib.layers.l2_regularizer(regularization_scale),
+            #         activation=misc.prelu)
+            #     pool4 = tf.layers.max_pooling2d(name="pool4", inputs=conv4, pool_size=2, strides=1, padding="same")
+            pool = pool2
+            for i in range(3, 3 + self.regular_conv_layers):
+                with tf.name_scope("conv_{}".format(i)):
+                    conv = tf.layers.conv2d(
+                        name="conv{}".format(i),
+                        inputs=pool,
+                        filters=32,
+                        kernel_size=5,
+                        padding="same",
+                        kernel_regularizer=tf.contrib.layers.l2_regularizer(regularization_scale),
+                        activation=misc.prelu)
+                    pool = tf.layers.max_pooling2d(name="pool{}".format(i), inputs=conv, pool_size=2, strides=1, padding="same")
 
             # Convolutional Layer #5 and Pooling Layer #5
-            with tf.name_scope("conv_5"):
+            with tf.name_scope("large_conv"):
                 conv5 = tf.layers.conv2d(
-                    name="conv5",
-                    inputs=pool4,
-                    filters=32,
-                    kernel_size=17,
+                    name="large_conv",
+                    inputs=pool,
+                    filters=self.large_conv_filters,
+                    kernel_size=self.large_conv_size,
                     padding="same",
                     kernel_regularizer=tf.contrib.layers.l2_regularizer(regularization_scale),
                     activation=misc.prelu)
-                pool5 = tf.layers.max_pooling2d(name="pool5", inputs=conv5, pool_size=2, strides=1, padding="same")
+                pool5 = tf.layers.max_pooling2d(name="large_pool", inputs=conv5, pool_size=2, strides=1, padding="same")
 
             with tf.name_scope("small_conv_1"):
                 small_conv1 = tf.layers.conv2d(
