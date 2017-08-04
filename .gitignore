@@ -5,3 +5,4 @@
 /inception-v3/
 .idea/
 __pycache__/
+*.pyc
