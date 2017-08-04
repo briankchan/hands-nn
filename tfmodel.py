@@ -23,6 +23,14 @@ class TFModel(Model, metaclass=ABCMeta):
                  pos_weight=10):
         super().__init__()
 
+    @property
+    def _train_feed_dict(self):
+        return {}
+
+    @property
+    def _test_feed_dict(self):
+        return {}
+
     def _build_model(self):
         self.config = tf.ConfigProto(allow_soft_placement=True)  # log_device_placement=True
         self.graph = tf.Graph()

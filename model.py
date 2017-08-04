@@ -121,7 +121,7 @@ class Model(metaclass=ABCMeta):
         if path_pattern is not None and os.path.exists(path_pattern):
             # load pathect path
             return path_pattern
-        
+
         if run_num is None:
             # load previous run
             return cls._get_prev_run(path_pattern)
