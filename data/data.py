@@ -1,7 +1,6 @@
 from math import ceil
 import numpy as np
 import cv2
-from misc import chunks
 
 DATA1 = "data/hands1-3650"
 DATA2 = "data/hands2-3650"
@@ -42,7 +41,7 @@ def split(count, use_dev=True, num_chunks=10, dev_chunks=5, test_chunks=9):
     both = np.r_[dev_chunks, test_chunks]
     size = ceil(count / num_chunks)
     slices = np.array([slice(i, i+size) for i in range(0, count, size)])
-    
+
     train = np.delete(slices, both)
     test = slices[dev_chunks if use_dev else test_chunks]
     return train, test
@@ -55,16 +54,6 @@ def get_small_dataset():
         TRAIN = [range(400)]
         TEST = [range(400, len(IMG))]
     return IMG, LAB, TRAIN, TEST
-
-def split_dataset(images, labels, use_dev=True):
-    count = len(images)
-    half = count // 2
-    six_tenths = count // 10 * 6
-    nine_tenths = count // 10 * 9
-
-    train = [range(half), range(six_tenths, nine_tenths)]
-    test = [range(half, six_tenths) if use_dev else range(nine_tenths, count)]
-    return train, test
 
 def get_dataset(dataset, use_dev=True, rem_noise=False, cross_validate=False):
     if dataset == "small":
