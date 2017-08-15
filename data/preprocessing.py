@@ -30,7 +30,7 @@ nan = float("nan")
 bag = rosbag.Bag("data1.bag")
 SKIP = 0#63 * 28
 SAVE_NP = True
-NP_FILENAME = "hands2-3650"
+NP_FILENAME = "hands1-3650"
 SAVE_VID = False
 FILENAME = "hands1medium.avi"
 
@@ -165,6 +165,25 @@ def getnextframe(messages, prevdepth, prevthermal):
     #     return np.zeros((COLOR_HEIGHT, COLOR_WIDTH), np.bool) # zero hands
     return np.fromstring(message.data, np.uint8).reshape(COLOR_HEIGHT, COLOR_WIDTH, 3), prevdepth, prevthermal
 
+def plottimes(messages):
+    thermal_times = []
+    color_times = []
+    depth_times = []
+    for topic, msg, time in messages:
+        if topic == THERMAL_TOPIC_NAME:
+            lst = thermal_times
+        elif topic == COLOR_TOPIC_NAME:
+            lst = color_times
+        elif topic == DEPTH_COLOR_NAME:
+            lst = depth_times
+        else:
+            continue
+        lst.append(time.to_time())
+    plt.plot(thermal_times, np.zeros_like(thermal_times), ".")
+    plt.plot(color_times, np.ones_like(color_times), ".")
+    plt.plot(depth_times, np.zeros_like(depth_times) + 2, ".")
+    plt.show()
+
 # out = getnexthands(messages)
 # print(len(out))
 color, prevdepth, prevthermal = getnextframe(messages, prevdepth, prevthermal)
@@ -184,7 +203,6 @@ def overlay(labels, image):
     # return cv2.addWeighted(overlay, OVERLAY_ALPHA, image, 1-OVERLAY_ALPHA, 0)
     image[labels] = overlaycolor
     return image
-
 
 
 def savevideo_old(filename, messages, prevdepth, prevthermal, labels, color):
